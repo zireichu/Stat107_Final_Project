@@ -1,0 +1,92 @@
+```{r}
+source("~/GitHub/Stat107_Final_Project/00_requirements.R")
+raw_data <- read_csv("C:/Users/zirei/OneDrive/Documents/GitHub/Stat107_Final_Project/Most-Recent-Cohorts-Institution.csv",
+  show_col_types = FALSE)
+# Examine dimensions
+dim(raw_data)
+glimpse(raw_data)
+# Pell grant variables
+pell_vars <- c(
+  "OMENRYP_PELL_ALL",
+  "OMENRAP_PELL_ALL",
+  "OMAWDP8_PELL_ALL",
+  "OMENRUP_PELL_ALL")
+# Institution IDs
+id_vars <- c(
+  "UNITID",
+  "OPEID",
+  "OPEID6",
+  "INSTNM",
+  "STABBR"
+)
+# Variables needed for research question
+research_vars <- c(
+  "ICLEVEL",
+  "PREDDEG",
+  "C150_4")
+# All PCIP variables
+pcip_vars <- names(raw_data)[
+  grepl("^PCIP", names(raw_data))]
+# Combine variables
+keep_vars <- unique(c(
+  pell_vars,
+  id_vars,
+  research_vars,
+  pcip_vars
+))
+# Verify required variables
+missing_vars <- setdiff(
+  c(pell_vars, id_vars, research_vars),
+  names(raw_data)
+)
+if (length(missing_vars) > 0) {
+  stop(
+    paste(
+      "Missing required variables:",
+      paste(missing_vars, collapse = ", ")
+    )
+  )
+}
+# Create cleaned dataset
+clean_data <- raw_data %>%
+  select(all_of(keep_vars))
+# Check resulting dimensions
+dim(clean_data)
+missing_summary <- clean_data %>%
+  summarise(
+    across(everything(), ~ sum(is.na(.)))
+  ) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "Variable",
+    values_to = "Missing_Count"
+  ) %>%
+  filter(Missing_Count > 0) %>%
+  arrange(desc(Missing_Count))
+print(missing_summary, n = 30)
+duplicate_ids <- clean_data %>%
+  count(UNITID) %>%
+  filter(n > 1)
+# Display duplicate institution IDs
+duplicate_ids
+# Number of duplicated IDs
+nrow(duplicate_ids)
+# Predominant degree classifications
+table(clean_data$PREDDEG, useNA = "ifany")
+# Institution levels
+table(clean_data$ICLEVEL, useNA = "ifany")
+# Number of institutions per state
+clean_data %>%
+  count(STABBR, sort = TRUE)
+# Save cleaned dataset as CSV
+write_csv(
+  clean_data,
+  "C:/Users/zirei/OneDrive/Documents/GitHub/Stat107_Final_Project/12_DataSaving.csv")
+# Save cleaned dataset as RData
+save(
+  clean_data,
+  file = "C:/Users/zirei/OneDrive/Documents/GitHub/Stat107_Final_Project/12_DataSaving.RData"
+)
+# Confirm final dimensions
+dim(clean_data)
+```

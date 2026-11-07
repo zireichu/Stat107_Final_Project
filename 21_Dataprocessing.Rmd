@@ -1,0 +1,151 @@
+```{r}
+source("00_requirements.R")
+# Load cleaned dataset
+load("C:/Users/zirei/OneDrive/Documents/GitHub/Stat107_Final_Project/12_DataSaving.RData")
+# Examine dataset
+dim(clean_data)
+glimpse(clean_data)
+# Keep universities classified as four-year
+four_year_data <- clean_data %>%
+  filter(ICLEVEL == 1)
+# Examine number of four-year universities
+nrow(four_year_data)
+# Check university levels
+table(four_year_data$ICLEVEL)
+# Selected STEM-related academic categories
+stem_vars <- c(
+  "PCIP11",  # Computer and information sciences
+  "PCIP14",  # Engineering
+  "PCIP15",  # Engineering technologies
+  "PCIP26",  # Biological and biomedical sciences
+  "PCIP27",  # Mathematics and statistics
+  "PCIP40",  # Physical sciences
+  "PCIP41"   # Science technologies
+  )
+# Verify all STEM variables exist
+if (!all(stem_vars %in% names(four_year_data))) {
+  stop("One or more STEM variables are missing.")
+}
+# Calculate the total STEM degree proportion
+four_year_data <- four_year_data %>%
+  mutate(
+    across(
+      all_of(stem_vars),
+      ~ as.numeric(as.character(.x))
+    )
+  ) %>%
+  mutate(
+    STEM_SHARE = if_else(
+      if_all(all_of(stem_vars), ~ !is.na(.x)),
+      rowSums(pick(all_of(stem_vars))),
+      NA_real_))
+# Examine STEM proportions
+summary(four_year_data$STEM_SHARE)
+# Classify universities based on STEM degree proportion
+# 50% or more = predominantly STEM-focused
+four_year_data <- four_year_data %>%
+  mutate(
+    STEM_FOCUSED = case_when(
+      is.na(STEM_SHARE) ~ NA,
+      STEM_SHARE >= 0.50 ~ TRUE,
+      TRUE ~ FALSE))
+# Count STEM-focused and non-STEM-focused universities
+table(
+  four_year_data$STEM_FOCUSED,
+  useNA = "ifany")
+# Keep the 50 US states
+us_states <- c(
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE",
+  "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS",
+  "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS",
+  "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY",
+  "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV",
+  "WI", "WY")
+# Restrict data to the 50 states
+four_year_data <- four_year_data %>%
+  filter(STABBR %in% us_states)
+# Aggregate university information by state
+state_summary <- four_year_data %>%
+  group_by(STABBR) %>%
+  summarise(
+    TOTAL_UNIVERSITIES = n(),
+
+    UNIVERSITIES_WITH_STEM_DATA =
+      sum(!is.na(STEM_FOCUSED)),
+
+    STEM_UNIVERSITIES =
+      sum(STEM_FOCUSED %in% TRUE),
+
+    STEM_PROPORTION =
+      if_else(
+        UNIVERSITIES_WITH_STEM_DATA > 0,
+        STEM_UNIVERSITIES /
+          UNIVERSITIES_WITH_STEM_DATA,
+        NA_real_
+      ),
+
+    UNIVERSITIES_WITH_GRAD_DATA =
+      sum(!is.na(C150_4)),
+
+    AVG_GRAD_RATE =
+      if (all(is.na(C150_4))) {
+        NA_real_
+      } else {
+        mean(C150_4, na.rm = TRUE)
+      },
+
+    MEDIAN_GRAD_RATE =
+      if (all(is.na(C150_4))) {
+        NA_real_
+      } else {
+        median(C150_4, na.rm = TRUE)
+      },
+
+    .groups = "drop")
+# Display state-level results
+print(state_summary)
+# Classify states according to their STEM proportion
+state_summary <- state_summary %>%
+  mutate(
+    STATE_GROUP = case_when(
+      is.na(STEM_PROPORTION) ~ NA_character_,
+      STEM_PROPORTION > 0.40 ~ "Above 40%",
+      TRUE ~ "40% or Below"))
+# Create dataset for comparisons
+state_analysis <- state_summary %>%
+  filter(
+    !is.na(STATE_GROUP),
+    !is.na(AVG_GRAD_RATE)
+  ) %>%
+  mutate(
+    STATE_GROUP = factor(
+      STATE_GROUP,
+      levels = c("40% or Below", "Above 40%"))  )
+# Count states in each group
+table(state_analysis$STATE_GROUP)
+# Compare average graduation rates
+state_analysis %>%
+  group_by(STATE_GROUP) %>%
+  summarise(
+    NUMBER_OF_STATES = n(),
+    MEAN_GRAD_RATE = mean(AVG_GRAD_RATE),
+    MEDIAN_GRAD_RATE = median(AVG_GRAD_RATE),
+    SD_GRAD_RATE = sd(AVG_GRAD_RATE),
+    .groups = "drop")
+# Save processed datasets
+save(
+  four_year_data,
+  state_summary,
+  state_analysis,
+  stem_vars,
+  file = "C:/Users/zirei/OneDrive/Documents/GitHub/Stat107_Final_Project/22_DataSaving.RData")
+# Export state summary as CSV
+write_csv(
+  state_summary,
+  "C:/Users/zirei/OneDrive/Documents/GitHub/Stat107_Final_Project/22_StateSummary.csv")
+# Confirm saved results
+dim(four_year_data)
+dim(state_summary)
+dim(state_analysis)
+```
